@@ -1,5 +1,9 @@
 class App < Sinatra::Base
   get '/' do
-    TestService.new.a
+    'Hi'
+  end
+
+  post '/deploy' do
+    Deployer.new(params['deploy'])
   end
 end
