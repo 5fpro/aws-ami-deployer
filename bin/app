@@ -12,7 +12,7 @@ def start(root_path, pid)
   env = ENV['RACK_ENV'] || 'development'
   log = File.join(root_path, 'log', "#{env}.log")
   port = args['p'] || args['port'] || 8080
-  host = args['h'] || args['host']
+  host = args['h'] || args['host'] || '0.0.0.0'
   `#{bin_file} -e #{env} -p #{port} -pid #{pid} -l #{log} -h #{host} -d `
   $stdout.puts "Running in pid: #{`cat #{pid}`}, port: #{port}, env: #{env}, log: #{log}"
 end
