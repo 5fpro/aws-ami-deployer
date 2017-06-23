@@ -2,6 +2,7 @@ source 'https://rubygems.org'
 gem 'dotenv'
 gem 'sinatra'
 gem 'rake'
+gem 'require_all'
 
 group :development do
   gem 'byebug'

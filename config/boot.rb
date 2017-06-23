@@ -17,7 +17,6 @@ def App.env
   @env ||= RACK_ENV
 end
 
-# Dir[File.join(App.root, 'app', '*')].each do |dir|
-#   # May not resolve dependency problem
-#   Dir.glob(File.join(dir, '*.rb')).each { |f| require f }
-# end
+Dir[File.join(App.root, 'app', '*')].each do |dir|
+  require_all File.join(dir, '**', '*.rb')
+end

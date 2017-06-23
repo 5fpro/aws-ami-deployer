@@ -4,6 +4,6 @@ class App < Sinatra::Base
   end
 
   post '/deploy' do
-    Deployer.new(params['deploy'])
+    Deployer.new(params['deploy'].deep_symbolize_keys).perform
   end
 end
