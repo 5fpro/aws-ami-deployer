@@ -1,0 +1,6 @@
+#!/usr/bin/env ruby
+RACK_ENV = ARGV[0] || 'development'
+require 'irb'
+require File.expand_path(File.join(File.dirname(__FILE__), '..', 'config', 'boot.rb'))
+ARGV.clear
+IRB.start

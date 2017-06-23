@@ -2,7 +2,7 @@ require 'rubygems'
 require 'bundler'
 Bundler.setup
 
-RACK_ENV = ENV["RACK_ENV"] || 'development'
+RACK_ENV ||= ENV['RACK_ENV'] || 'development'
 Bundler.require(:default, RACK_ENV)
 
 require 'sinatra'

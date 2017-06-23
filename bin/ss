@@ -1,0 +1,16 @@
+#!/usr/bin/env ruby
+require 'rack'
+
+args = Hash[ ARGV.join(' ').scan(/-?([^=\s]+)(?:[ =](\S+))?/) ]
+port = args['p'] || args['port'] || 8080
+env = args['e'] || args['env'] || 'development'
+pid = args['pid']
+log = args['l'] || args['log']
+Rack::Server.new(
+  config: File.expand_path(File.join(File.dirname(__FILE__), '..', 'config.ru')),
+  environment: env,
+  Port: port,
+  pid: pid,
+  AccessLog: log,
+  daemonize: args.key?('d')
+).start
