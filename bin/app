@@ -1,0 +1,33 @@
+#!/usr/bin/env ruby
+require 'rack'
+
+root_path = File.expand_path(File.join(File.dirname(__FILE__), '../'))
+pid = File.join(root_path, 'tmp', 'pids', 'app.pid')
+
+`mkdir -p #{File.join(root_path, 'tmp', 'pids')}`
+`mkdir -p #{File.join(root_path, 'log')}`
+def start(root_path, pid)
+  bin_file = File.expand_path(File.join(root_path, 'bin', 'ss'))
+  args = Hash[ ARGV.join(' ').scan(/-?([^=\s]+)(?:[ =](\S+))?/) ]
+  env = ENV['RACK_ENV'] || 'development'
+  log = File.join(root_path, 'log', "#{env}.log")
+  port = args['p'] || args['port'] || 8080
+  host = args['h'] || args['host'] || '0.0.0.0'
+  `#{bin_file} -e #{env} -p #{port} -pid #{pid} -l #{log} -h #{host} -d `
+  $stdout.puts "Running in pid: #{`cat #{pid}`}, port: #{port}, env: #{env}, log: #{log}"
+end
+
+def stop(pid)
+  `kill -9 \`cat #{pid}\``
+end
+
+def restart(root_path, pid)
+  stop(pid)
+  start(root_path, pid)
+end
+
+case ARGV[0]
+when 'start' then start(root_path, pid)
+when 'stop' then stop(pid)
+when 'restart' then restart(root_path, pid)
+end
