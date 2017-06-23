@@ -1,0 +1,8 @@
+/.bundle
+/.env
+/log/*.log
+/tmp
+.DS_Store
+/.capistrano/*
+/.rubocop_todo.yml
+/.byebug_history
