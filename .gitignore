@@ -1,8 +1,14 @@
 /.bundle
 /.env
+/.env.*
+!/.env.example
 /log/*.log
 /tmp
 .DS_Store
 /.capistrano/*
 /.rubocop_todo.yml
 /.byebug_history
+/log
+/tmp
+/config/deploy/*.rb
+!/config/deploy/example.rb
