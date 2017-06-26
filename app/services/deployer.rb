@@ -1,5 +1,4 @@
 class Deployer
-
   # Eaxmple:
   #   {
   #     count: 1,
@@ -206,6 +205,6 @@ class Deployer
   end
 
   def log(msg)
-    # puts msg
+    Thread.current[:stdout] = msg
   end
 end
