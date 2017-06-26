@@ -8,13 +8,13 @@ class App < Sinatra::Base
   end
 
   post '/deploy' do
-    puts "deploy##{params[:no]}"
-    Deployer.new(params['deploy'].symbolize_keys).perform
+    Deployer.new(params['deploy'].symbolize_keys.merge(log_id: params[:no])).perform
   end
 
-  get '/logging' do
+  get '/log' do
+    log_file = File.join(App.root, 'log', "deploy-#{params[:no]}.log")
     reload_script = params['live'] ? '<script>setTimeout(function(){location.reload();}, 5000);</script>' : ''
-    res = `cat log/#{App.env}.log | awk 'BEGIN{ found=0} /deploy##{params[:no]}/{found=1}  {if (found) print }'`
+    res = `cat #{log_file}`
     res.to_s.gsub("\n", "<br />\n") + reload_script
   end
 end

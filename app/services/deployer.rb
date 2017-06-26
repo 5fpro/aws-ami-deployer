@@ -30,7 +30,7 @@ class Deployer
   #     },
   #     awscli_postfix: '--profile shopmatic'
   #   }
-  def initialize(count:, name:, source_instance_id:, lunch_options:, health_check_rule:, default_tags:, elb_name:, git:, awscli_postfix: '')
+  def initialize(count:, name:, source_instance_id:, lunch_options:, health_check_rule:, default_tags:, elb_name:, git:, awscli_postfix: '', log_id: nil)
     @count = count
     @name = name
     @instance = source_instance_id
@@ -40,6 +40,7 @@ class Deployer
     @elb_name = elb_name
     @default_tags = default_tags || {}
     @awscli_postfix = awscli_postfix
+    @log_id = log_id || Time.now.to_f
     Thread.current[:log] = []
   end
 
@@ -53,6 +54,7 @@ class Deployer
     log exists_instances.inspect
     add_instances_to_elb_until_available(@elb_name, instances)
     remove_and_terminate_exists_instances_from_elb(@elb_name, exists_instances)
+    @log_id
   end
 
   private
@@ -206,6 +208,11 @@ class Deployer
   end
 
   def log(msg)
+    logger.info msg
     STDOUT.puts msg
+  end
+
+  def logger
+    @logger ||= Logger.new(File.join(App.root, 'log', "deploy-#{@log_id}.log"))
   end
 end
