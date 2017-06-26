@@ -206,6 +206,6 @@ class Deployer
   end
 
   def log(msg)
-    Thread.current[:log] << msg
+    STDOUT.puts msg
   end
 end

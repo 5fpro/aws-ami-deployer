@@ -1,5 +1,5 @@
 CAP_CONFIG_FILES = [
-  '.env',
+  '.env'
 ].freeze
 
 namespace :config do

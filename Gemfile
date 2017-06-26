@@ -1,18 +1,18 @@
 source 'https://rubygems.org'
+gem 'activesupport'
 gem 'dotenv'
-gem 'sinatra'
+gem 'faraday'
 gem 'rake'
 gem 'require_all'
-gem 'activesupport'
-gem 'faraday'
+gem 'sinatra'
 
 group :development do
   gem 'byebug'
+  gem 'capistrano'
+  gem 'capistrano-bundler'
+  gem 'capistrano-rbenv'
   gem 'foreman'
   gem 'rubocop'
-  gem 'capistrano'
-  gem 'capistrano-rbenv'
-  gem 'capistrano-bundler'
 end
 
 group :test do

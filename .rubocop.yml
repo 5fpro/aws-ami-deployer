@@ -138,3 +138,9 @@ Lint/AmbiguousBlockAssociation:
 
 Style/SymbolArray:
   EnforcedStyle: brackets
+
+Metrics/ClassLength:
+  Max: 200
+
+Metrics/ParameterLists:
+  Max: 15
