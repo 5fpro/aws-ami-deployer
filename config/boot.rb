@@ -4,6 +4,7 @@ Bundler.setup
 
 RACK_ENV ||= ENV['RACK_ENV'] || 'development'
 Bundler.require(:default, RACK_ENV)
+require 'dotenv/load'
 
 require 'sinatra'
 require 'active_support/all'
