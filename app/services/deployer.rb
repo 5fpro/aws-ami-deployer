@@ -47,7 +47,7 @@ class Deployer
 
   def perform
     ami_name = "#{@name}-web-#{Time.now.strftime('%Y%m%d%H%M')}"
-    return 'instance not health' unless health?(@instance)
+    return 'instance not health' unless check_instance_health(@instance)
 
     ami_id = create_ami_until_available(@instance, ami_name)
     instances = create_instances_until_available(ami_id, @count)
@@ -60,6 +60,19 @@ class Deployer
   end
 
   private
+
+  def check_instance_health(instance)
+    count = 1
+    health = false
+    until(health || count >= 30)
+      log "checking health of #{instance}...(#{count}/30)"
+      res = health?(instance)
+      log res.inspect
+      count += 1
+      sleep(10)
+    end
+    health
+  end
 
   def create_ami_until_available(instance_id, ami_name)
     ami_id = create_ami(instance_id, ami_name)
@@ -78,7 +91,7 @@ class Deployer
 
   def create_instances_until_available(ami_id, count)
     instances = create_instances(ami_id, count)
-    log instances.inspect
+    log "created instances: #{instances.inspect}"
     instances.each_with_index do |instance, index|
       @default_tags.each { |key, value| create_instance_tags(instance, key, value) }
       create_instance_tags(instance, 'Name', "#{@name}-#{index + 1}")
@@ -89,7 +102,7 @@ class Deployer
         state = fetch_instance_state(instance)
         runed = state == 'running'
         health = runed ? health?(instance) : false
-        log "#{instance}: #{state}, #{health}"
+        log "#{instance} => status: #{state}, health: #{health}"
         ok_instances << instance if runed && health
       end
       ok_instances.each { |i| instances.delete(i) }
@@ -135,7 +148,7 @@ class Deployer
         end
         res = (response.status == checker[:status].to_i && response.body.index(checker[:body_match]) >= 0)
       rescue => e
-        log e.message
+        log "instance #{instance_id} is not health: #{e.message}"
       end
     end
     res
