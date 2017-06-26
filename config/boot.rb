@@ -8,10 +8,12 @@ Bundler.require(:default, RACK_ENV)
 require 'sinatra'
 require 'active_support/all'
 
+ROOT_DIR = File.expand_path(File.join(File.dirname(__FILE__), '..')).freeze
+
 require File.expand_path(File.join(File.dirname(__FILE__), 'application'))
 
 def App.root
-  @root ||= File.expand_path(File.join(File.dirname(__FILE__), '..'))
+  @root ||= ROOT_DIR
 end
 
 def App.env
