@@ -11,6 +11,5 @@ Rack::Server.new(
   environment: env,
   Port: port,
   pid: pid,
-  daemonize: args.key?('d'),
   Host: host
 ).start
