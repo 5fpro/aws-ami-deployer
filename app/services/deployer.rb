@@ -66,8 +66,8 @@ class Deployer
     health = false
     until(health || count >= 30)
       log "checking health of #{instance}...(#{count}/30)"
-      res = health?(instance)
-      log res.inspect
+      health = health?(instance)
+      log health.inspect
       count += 1
       sleep(10)
     end
