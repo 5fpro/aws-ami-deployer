@@ -6,6 +6,7 @@ RACK_ENV ||= ENV['RACK_ENV'] || 'development'
 Bundler.require(:default, RACK_ENV)
 
 require 'sinatra'
+require 'active_support/all'
 
 require File.expand_path(File.join(File.dirname(__FILE__), 'application'))
 
