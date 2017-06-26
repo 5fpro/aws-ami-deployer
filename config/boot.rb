@@ -21,11 +21,3 @@ end
 Dir[File.join(App.root, 'app', '*')].each do |dir|
   require_all File.join(dir, '**', '*.rb')
 end
-
-unless App.env == 'development'
-  log_file = File.new("#{App.root}/log/#{App.env}.log", 'a+')
-  STDOUT.reopen(log_file)
-  STDERR.reopen(log_file)
-  STDOUT.sync = true
-  STDERR.sync = true
-end

@@ -11,8 +11,9 @@ def start(root_path, pid)
   args = Hash[ ARGV.join(' ').scan(/-?([^=\s]+)(?:[ =](\S+))?/) ]
   env = ENV['RACK_ENV'] || 'development'
   port = args['p'] || args['port'] || 8080
+  log = File.join(root_path, 'log', "#{env}.log")
   host = args['h'] || args['host'] || '0.0.0.0'
-  `#{bin_file} -e #{env} -p #{port} -pid #{pid} -h #{host} -d `
+  `#{bin_file} -e #{env} -p #{port} -pid #{pid} -h #{host} >> #{log} 2>&1 &`
   $stdout.puts "Running in pid: #{`cat #{pid}`}, port: #{port}, env: #{env}"
 end
 
