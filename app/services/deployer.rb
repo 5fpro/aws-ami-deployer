@@ -41,6 +41,7 @@ class Deployer
     @default_tags = default_tags || {}
     @awscli_postfix = awscli_postfix
     @log_id = log_id || Time.now.to_f
+    @log_file = File.join(App.root, 'log', "deploy-#{@log_id}.log")
     Thread.current[:log] = []
   end
 
@@ -54,6 +55,7 @@ class Deployer
     log exists_instances.inspect
     add_instances_to_elb_until_available(@elb_name, instances)
     remove_and_terminate_exists_instances_from_elb(@elb_name, exists_instances)
+    `rm #{@log_file}`
     @log_id
   end
 
@@ -213,6 +215,6 @@ class Deployer
   end
 
   def logger
-    @logger ||= Logger.new(File.join(App.root, 'log', "deploy-#{@log_id}.log"))
+    @logger ||= Logger.new(@log_file)
   end
 end
