@@ -201,7 +201,7 @@ class Deployer
   end
 
   def aws_cmd(body)
-    res = `aws #{body} #{@awscli_postfix}`
+    res = `#{ENV['AWS_PATH']}aws #{body} #{@awscli_postfix}`
     res.present? ? JSON.parse(res) : res
   end
 
