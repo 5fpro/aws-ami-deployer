@@ -12,9 +12,7 @@ ROOT_DIR = File.expand_path(File.join(File.dirname(__FILE__), '..')).freeze
 
 require File.expand_path(File.join(File.dirname(__FILE__), 'application'))
 
-def App.root
-  @root ||= ROOT_DIR
-end
+App.root = ROOT_DIR
 
 def App.env
   @env ||= RACK_ENV
@@ -22,4 +20,12 @@ end
 
 Dir[File.join(App.root, 'app', '*')].each do |dir|
   require_all File.join(dir, '**', '*.rb')
+end
+
+unless App.env == 'development'
+  log_file = File.new("#{App.root}/log/#{App.env}.log", 'a+')
+  STDOUT.reopen(log_file)
+  STDERR.reopen(log_file)
+  STDOUT.sync = true
+  STDERR.sync = true
 end

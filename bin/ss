@@ -5,14 +5,12 @@ args = Hash[ ARGV.join(' ').scan(/-?([^=\s]+)(?:[ =](\S+))?/) ]
 port = args['p'] || args['port'] || 8080
 env = args['e'] || args['env'] || 'development'
 pid = args['pid']
-log = args['l'] || args['log']
 host = args['h'] || args['host'] || '0.0.0.0'
 Rack::Server.new(
   config: File.expand_path(File.join(File.dirname(__FILE__), '..', 'config.ru')),
   environment: env,
   Port: port,
   pid: pid,
-  AccessLog: log,
   daemonize: args.key?('d'),
   Host: host
 ).start
