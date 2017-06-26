@@ -10,11 +10,10 @@ def start(root_path, pid)
   bin_file = File.expand_path(File.join(root_path, 'bin', 'ss'))
   args = Hash[ ARGV.join(' ').scan(/-?([^=\s]+)(?:[ =](\S+))?/) ]
   env = ENV['RACK_ENV'] || 'development'
-  log = File.join(root_path, 'log', "#{env}.log")
   port = args['p'] || args['port'] || 8080
   host = args['h'] || args['host'] || '0.0.0.0'
-  `#{bin_file} -e #{env} -p #{port} -pid #{pid} -l #{log} -h #{host} -d `
-  $stdout.puts "Running in pid: #{`cat #{pid}`}, port: #{port}, env: #{env}, log: #{log}"
+  `#{bin_file} -e #{env} -p #{port} -pid #{pid} -h #{host} -d `
+  $stdout.puts "Running in pid: #{`cat #{pid}`}, port: #{port}, env: #{env}"
 end
 
 def stop(pid)

@@ -3,6 +3,7 @@ gem 'dotenv'
 gem 'sinatra'
 gem 'rake'
 gem 'require_all'
+gem 'activesupport'
 
 group :development do
   gem 'byebug'
