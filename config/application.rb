@@ -8,7 +8,6 @@ class App < Sinatra::Base
   end
 
   get '/log' do
-    n = params[:n] || 20
-    `tail -n #{n} -f #{App.root}/log/#{App.env}.log`
+    Thread.current[:log].join("<br />\n")
   end
 end

@@ -47,7 +47,7 @@ after 'deploy:publishing', 'deploy:restart'
 namespace :deploy do
   task :restart do
     on roles(:web) do |_host|
-      execute "cd #{current_path} && #{fetch(:rbenv_prefix)} bundle exec bin/app restart -p #{fetch(:port)} -h #{fetch(:host)}"
+      execute "cd #{current_path} && RACK_ENV=#{fetch(:stage)} #{fetch(:rbenv_prefix)} bundle exec bin/app restart -p #{fetch(:port)} -h #{fetch(:host)}"
     end
   end
 end

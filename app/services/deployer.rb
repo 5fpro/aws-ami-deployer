@@ -40,6 +40,7 @@ class Deployer
     @elb_name = elb_name
     @default_tags = default_tags || {}
     @awscli_postfix = awscli_postfix
+    Thread.current[:log] = []
   end
 
   def perform
@@ -205,6 +206,6 @@ class Deployer
   end
 
   def log(msg)
-    Thread.current[:stdout] = msg
+    Thread.current[:log] << msg
   end
 end
