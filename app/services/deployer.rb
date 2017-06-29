@@ -156,7 +156,7 @@ class Deployer
     if res
       @instances_health[instance_id] += 1
       log "instance #{instance_id} is health (#{@instances_health[instance_id]}/#{checker[:count]})"
-      @instances_health[instance_id] >= checker[:count]
+      @instances_health[instance_id] >= checker[:count].to_i
     else
       @instances_health[instance_id] = 0
       res
