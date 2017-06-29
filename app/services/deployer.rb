@@ -18,7 +18,8 @@ class Deployer
   #       method: 'get',
   #       path: '/ping',
   #       status: 200,
-  #       body_match: 'ok'
+  #       body_match: 'ok',
+  #       count: 3
   #     },
   #     git: {
   #       sha: '1231231',
@@ -62,14 +63,12 @@ class Deployer
   private
 
   def check_instance_health(instance)
-    count = 1
     health = false
-    until(health || count >= 30)
-      log "checking health of #{instance}...(#{count}/30)"
+    until(health)
+      log "checking health of #{instance}"
       health = health?(instance)
       log health.inspect
-      count += 1
-      sleep(10)
+      sleep(5)
     end
     health
   end
@@ -134,11 +133,14 @@ class Deployer
   end
 
   def health?(instance_id)
+    @instances_health ||= {}
+    @instances_health[instance_id] ||= 0
     checker = @health_check_rule
     checker[:protocol] ||= 'http'
     checker[:status] ||= 200
     checker[:port] ||= 80
     checker[:method] ||= 'get'
+    checker[:count] ||= 3
     ip = fetch_instance_ip(instance_id)
     res = false
     if ip
@@ -151,7 +153,14 @@ class Deployer
         log "instance #{instance_id} is not health: #{e.message}"
       end
     end
-    res
+    if res
+      @instances_health[instance_id] += 1
+      log "instance #{instance_id} is health (#{@instances_health[instance_id]}/#{checker[:count]})"
+      @instances_health[instance_id] >= checker[:count]
+    else
+      @instances_health[instance_id] = 0
+      res
+    end
   end
 
   def terminate_instance(instance_id)
