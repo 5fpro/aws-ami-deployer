@@ -78,7 +78,7 @@ class Deployer
     log "ami: #{ami_id}"
     create_ami_tag(ami_id, 'Branch', @git[:branch])
     create_ami_tag(ami_id, 'SHA', @git[:sha])
-    create_ami_tag(ami_id, 'Deploy', @name)
+    create_ami_tag(ami_id, 'AMIDeploy', @name)
     status = nil
     while status != 'available'
       status = fetch_ami_status(ami_id)
@@ -94,6 +94,7 @@ class Deployer
     instances.each_with_index do |instance, index|
       @default_tags.each { |key, value| create_instance_tags(instance, key, value) }
       create_instance_tags(instance, 'Name', "#{@name}-#{index + 1}")
+      create_instance_tags(instance, 'AMIDeploy', @name)
     end
     ok_instances = []
     until instances.empty?
