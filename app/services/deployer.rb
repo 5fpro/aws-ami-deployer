@@ -5,7 +5,7 @@ class Deployer
   #     name: 'doodle-web',
   #     source_instance_id: 'i-08643369d25e61025',
   #     elb_name: 'livetest-5fpro-com',
-  #     lunch_options: {
+  #     launch_options: {
   #       security_group_id: 'sg-622e0f05',
   #       instance_type: 't2.small',
   #       subnet_id: 'subnet-541d2530',
@@ -31,11 +31,11 @@ class Deployer
   #     },
   #     awscli_postfix: '--profile shopmatic'
   #   }
-  def initialize(count:, name:, source_instance_id:, lunch_options:, health_check_rule:, default_tags:, elb_name:, git:, awscli_postfix: '', log_id: nil)
+  def initialize(count:, name:, source_instance_id:, launch_options:, health_check_rule:, default_tags:, elb_name:, git:, awscli_postfix: '', log_id: nil)
     @count = count
     @name = name
     @instance = source_instance_id
-    @lunch_options = lunch_options.symbolize_keys
+    @launch_options = launch_options.symbolize_keys
     @health_check_rule = health_check_rule
     @git = git
     @elb_name = elb_name
@@ -183,13 +183,13 @@ class Deployer
   def create_instances(ami_id, count)
     options = [
       '--monitoring Enabled=true',
-      "--security-group-ids #{@lunch_options[:security_group_id]}",
-      "--instance-type #{@lunch_options[:instance_type]}",
+      "--security-group-ids #{@launch_options[:security_group_id]}",
+      "--instance-type #{@launch_options[:instance_type]}",
       '--enable-api-termination',
-      "--subnet-id #{@lunch_options[:subnet_id]}",
+      "--subnet-id #{@launch_options[:subnet_id]}",
       '--associate-public-ip-address',
-      "--iam-instance-profile Name=\"#{@lunch_options[:iam_role]}\"",
-      "--placement AvailabilityZone=#{@lunch_options[:availability_zone]}",
+      "--iam-instance-profile Name=\"#{@launch_options[:iam_role]}\"",
+      "--placement AvailabilityZone=#{@launch_options[:availability_zone]}",
       "--count #{count}"
     ]
     aws_cmd("ec2 run-instances --image-id #{ami_id} #{options.join(' ')}")['Instances'].map { |h| h['InstanceId'] }
