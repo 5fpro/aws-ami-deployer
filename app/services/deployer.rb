@@ -12,6 +12,14 @@ class Deployer
   #       iam_role: 'ec2',
   #       availability_zone: 'ap-southeast-1a'
   #     },
+  #     post_create_scripts: {
+  #       ssh_user: "ubuntu", # default to current user
+  #       ssh_command: "ssh", # default to 'ssh'
+  #       ssh_port: 22, # default to '22'
+  #       commands: ['echo hello > /tmp/hello.txt'],
+  #       local_files: ['/path/to/local/script.sh'],
+  #       remote_files: ['/path/to/script.sh', '/another/script.sh']
+  #     }
   #     health_check_rule: {
   #       port: 88,
   #       protocol: 'http',
@@ -31,7 +39,7 @@ class Deployer
   #     },
   #     awscli_postfix: '--profile shopmatic'
   #   }
-  def initialize(count:, name:, source_instance_id:, launch_options:, health_check_rule:, default_tags:, elb_name:, git:, awscli_postfix: '', log_id: nil)
+  def initialize(count:, name:, source_instance_id:, launch_options:, health_check_rule:, default_tags:, elb_name:, git:, awscli_postfix: '', log_id: nil, post_create_scripts: {})
     @count = count
     @name = name
     @instance = source_instance_id
@@ -43,6 +51,7 @@ class Deployer
     @awscli_postfix = awscli_postfix
     @log_id = log_id || Time.now.to_f
     @log_file = File.join(App.root, 'log', "deploy-#{@log_id}.log")
+    @post_create_scripts = post_create_scripts
     Thread.current[:log] = []
   end
 
@@ -90,10 +99,13 @@ class Deployer
 
   def create_instances_until_available(ami_id, count)
     instances = create_instances(ami_id, count)
+    names = {}
     log "created instances: #{instances.inspect}"
     instances.each_with_index do |instance, index|
       @default_tags.each { |key, value| create_instance_tags(instance, key, value) }
-      create_instance_tags(instance, 'Name', "#{@name}-#{index + 1}")
+      instance_name = "#{@name}-#{index + 1}"
+      names[instance] = instance_name
+      create_instance_tags(instance, 'Name', instance_name)
       create_instance_tags(instance, 'AMIDeploy', @name)
     end
     ok_instances = []
@@ -107,6 +119,10 @@ class Deployer
       end
       ok_instances.each { |i| instances.delete(i) }
       sleep(20) unless instances.empty?
+    end
+    # why we need read instance's name from map is because their names are not in order
+    ok_instances.each do |instance|
+      run_post_create_scripts(instance, names[instance])
     end
     ok_instances
   end
@@ -225,6 +241,54 @@ class Deployer
 
   def check_instance_health_of_elb(elb_name, instance_id)
     aws_cmd("elb describe-instance-health --load-balancer-name #{elb_name} --instances #{instance_id}")['InstanceStates'].first['State']
+  end
+
+  def run_command_with_log(cmd)
+    IO.popen(cmd) do |result|
+      while output = result.gets
+        log ">> #{output}" 
+      end
+    end
+  end
+
+  def replace_instance_name_from_cmd(cmd, instance_name)
+    cmd.gsub(/<INSTANCE_NAME>/, instance_name)
+  end
+
+  def pack_remote_command(cmd)
+    time = Time.now.to_f
+    result = "<<'__ENDOFCOMMAND_#{time}__' \n"
+    result << cmd
+    result << "\n"
+    result << "__ENDOFCOMMAND_#{time}__"
+    result
+  end
+
+  def run_post_create_scripts(instance_id, instance_name)
+    ip = fetch_instance_ip(instance_id)
+    # We do not check the host key since it will be changed by AWS
+    ssh_command = @post_create_scripts[:ssh_command] || "ssh -o StrictHostKeyChecking=no"
+    ssh_user = @post_create_scripts[:ssh_user].nil? ? "" : "#{@post_create_scripts[:ssh_user]}@"
+    command_prefix = "#{ssh_command} #{ssh_user}#{ip}"
+    # commands
+    @post_create_scripts[:commands]&.each do |remote_raw_command|
+      remote_command = replace_instance_name_from_cmd(remote_raw_command, instance_name)
+      log "running command: #{remote_command}"
+      cmd =  "#{command_prefix} #{pack_remote_command(remote_command)}"
+      run_command_with_log(cmd)
+    end
+    # local scripts
+    @post_create_scripts[:local_files]&.each do |filename|
+      log "running local script: #{filename}"
+      cmd = "#{command_prefix} #{pack_remote_command(File.read(filename))}"
+      run_command_with_log(cmd)
+    end
+    # remote scripts
+    @post_create_scripts[:remote_files]&.each do |filename|
+      log "running remote script: #{filename}"
+      cmd = "#{command_prefix} #{pack_remote_command("sh #{filename}")}"
+      run_command_with_log(cmd)
+    end
   end
 
   def aws_cmd(body)
