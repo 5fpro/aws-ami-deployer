@@ -246,7 +246,8 @@ class Deployer
   def run_command_with_log(cmd)
     IO.popen(cmd) do |result|
       while output = result.gets
-        log ">> #{output}" 
+        # remove color code for logging
+        log ">> #{output.gsub(/\e\[.*?m/,'')}" 
       end
     end
   end
