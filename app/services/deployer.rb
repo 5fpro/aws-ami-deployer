@@ -18,7 +18,11 @@ class Deployer
   #       ssh_port: 22, # default to '22'
   #       commands: ['echo hello > /tmp/hello.txt'],
   #       local_files: ['/path/to/local/script.sh'],
-  #       remote_files: ['/path/to/script.sh', '/another/script.sh']
+  #       remote_files: ['/path/to/script.sh', '/another/script.sh'],
+  #       route53_a_records: {
+  #         hosted_zone_id: 'xxxxx',
+  #         name_pattern: 'web-<INDEX>'
+  #       }
   #     }
   #     health_check_rule: {
   #       port: 88,
@@ -121,8 +125,8 @@ class Deployer
       sleep(20) unless instances.empty?
     end
     # why we need read instance's name from map is because their names are not in order
-    ok_instances.each do |instance|
-      run_post_create_scripts(instance, names[instance])
+    ok_instances.each_with_index do |instance, index|
+      run_post_create_scripts(instance, names[instance], index)
     end
     ok_instances
   end
@@ -247,13 +251,16 @@ class Deployer
     IO.popen(cmd) do |result|
       while output = result.gets
         # remove color code for logging
-        log ">> #{output.gsub(/\e\[.*?m/,'')}" 
+        log ">> #{output.gsub(/\e\[.*?m/,'')}"
       end
     end
   end
 
-  def replace_instance_name_from_cmd(cmd, instance_name)
-    cmd.gsub(/<INSTANCE_NAME>/, instance_name)
+  def replace_instance_name_from_cmd(cmd, opts = {})
+    opt.each do |find, replace|
+      cmd = cmd.gsub(/<#{find.to_s_upcase}>/, replace)
+    end
+    cmd
   end
 
   def pack_remote_command(cmd)
@@ -265,7 +272,7 @@ class Deployer
     result
   end
 
-  def run_post_create_scripts(instance_id, instance_name)
+  def run_post_create_scripts(instance_id, instance_name, index)
     ip = fetch_instance_ip(instance_id)
     # We do not check the host key since it will be changed by AWS
     ssh_command = @post_create_scripts[:ssh_command] || "ssh -o StrictHostKeyChecking=no"
@@ -273,7 +280,7 @@ class Deployer
     command_prefix = "#{ssh_command} #{ssh_user}#{ip}"
     # commands
     @post_create_scripts[:commands]&.each do |remote_raw_command|
-      remote_command = replace_instance_name_from_cmd(remote_raw_command, instance_name)
+      remote_command = replace_instance_name_from_cmd(remote_raw_command, instance_name: instance_name)
       log "running command: #{remote_command}"
       cmd =  "#{command_prefix} #{pack_remote_command(remote_command)}"
       run_command_with_log(cmd)
@@ -290,6 +297,19 @@ class Deployer
       cmd = "#{command_prefix} #{pack_remote_command("sh #{filename}")}"
       run_command_with_log(cmd)
     end
+    # assign route53 a record
+    name_pattern = @post_create_scripts[:route53_a_records]&.dig(:name_pattern)
+    assign_route53_a_record(ip, replace_instance_name_from_cmd(name_pattern, instance_id: instance_id, instance_name: instance_name, index: index))
+  end
+
+  def assign_route53_a_record(ip, name)
+    hosted_zone_id = @post_create_scripts[:route53_a_records]&.dig(:hosted_zone_id)
+    tmp_json_file = File.join('', 'tmp', "#{ip}-#{name}-#{Time.now.to_i}")
+    IO.write(tmp_json_file, {
+      Changes: [{ Action: 'UPSERT', ResourceRecordSet: { Name: name, Type: 'A', ResourceRecords: [{ Value: ip }] } }]
+    }.to_json)
+    aws_cmd("route53 change-resource-record-sets --hosted-zone-id #{hosted_zone_id} --change-batch #{tmp_json_file}")
+    File.delete(tmp_json_file)
   end
 
   def aws_cmd(body)
