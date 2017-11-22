@@ -60,6 +60,8 @@ class Deployer
   end
 
   def perform
+    log "Parameters: #{params.inspect}"
+  begin
     ami_name = "#{@name}-web-#{Time.now.strftime('%Y%m%d%H%M')}"
     return 'instance not health' unless check_instance_health(@instance)
 
@@ -70,10 +72,31 @@ class Deployer
     add_instances_to_elb_until_available(@elb_name, instances)
     remove_and_terminate_exists_instances_from_elb(@elb_name, exists_instances)
     `rm #{@log_file}`
+  rescue => e
+    log "Fail! #{e.class.to_s}: #{e.message}"
+    log e.backtrace.inspect
+  end
     @log_id
   end
 
   private
+
+  def params
+    @params ||= {
+      log_id: @log_id,
+      log_file: @log_file,
+      count: @count,
+      name: @name,
+      source_instance_id: @source_instance_id,
+      launch_options: @launch_options,
+      health_check_rule: @health_check_rule,
+      default_tags: @default_tags,
+      elb_name: @elb_name,
+      git: @git,
+      awscli_postfix: @awscli_postfix,
+      post_create_scripts: @post_create_scripts
+    }
+  end
 
   def check_instance_health(instance)
     health = false
