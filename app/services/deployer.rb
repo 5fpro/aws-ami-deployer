@@ -21,7 +21,7 @@ class Deployer
   #       remote_files: ['/path/to/script.sh', '/another/script.sh'],
   #       route53_a_records: {
   #         hosted_zone_id: 'xxxxx',
-  #         name_pattern: 'web-<INDEX>'
+  #         domain_name_pattern: 'web-<INDEX>.example.com'
   #       }
   #     }
   #     health_check_rule: {
@@ -298,17 +298,17 @@ class Deployer
       run_command_with_log(cmd)
     end
     # assign route53 a record
-    name_pattern = @post_create_scripts[:route53_a_records]&.dig(:name_pattern)
-    assign_route53_a_record(ip, replace_instance_name_from_cmd(name_pattern, instance_id: instance_id, instance_name: instance_name, index: index))
+    domain_name_pattern = @post_create_scripts[:route53_a_records]&.dig(:domain_name_pattern)
+    assign_route53_a_record(ip, replace_instance_name_from_cmd(domain_name_pattern, instance_id: instance_id, instance_name: instance_name, index: index))
   end
 
-  def assign_route53_a_record(ip, name)
+  def assign_route53_a_record(ip, domain_name)
     hosted_zone_id = @post_create_scripts[:route53_a_records]&.dig(:hosted_zone_id)
-    tmp_json_file = File.join('', 'tmp', "#{ip}-#{name}-#{Time.now.to_i}")
+    tmp_json_file = File.join('', 'tmp', "#{ip}-#{domain_name}-#{Time.now.to_i}")
     IO.write(tmp_json_file, {
-      Changes: [{ Action: 'UPSERT', ResourceRecordSet: { Name: name, Type: 'A', ResourceRecords: [{ Value: ip }] } }]
+      Changes: [{ Action: 'UPSERT', ResourceRecordSet: { Name: domain_name, Type: 'A', TTL: 300, ResourceRecords: [{ Value: ip }] } }]
     }.to_json)
-    aws_cmd("route53 change-resource-record-sets --hosted-zone-id #{hosted_zone_id} --change-batch #{tmp_json_file}")
+    aws_cmd("route53 change-resource-record-sets --hosted-zone-id #{hosted_zone_id} --change-batch file://#{tmp_json_file}")
     File.delete(tmp_json_file)
   end
 
