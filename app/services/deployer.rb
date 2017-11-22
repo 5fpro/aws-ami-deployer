@@ -322,7 +322,8 @@ class Deployer
     end
     # assign route53 a record
     domain_name_pattern = @post_create_scripts[:route53_a_records]&.dig(:domain_name_pattern)
-    assign_route53_a_record(ip, replace_instance_name_from_cmd(domain_name_pattern, instance_id: instance_id, instance_name: instance_name, index: index))
+    domain_name = replace_instance_name_from_cmd(domain_name_pattern, instance_id: instance_id, instance_name: instance_name, index: index + 1)
+    assign_route53_a_record(ip, domain_name)
   end
 
   def assign_route53_a_record(ip, domain_name)
