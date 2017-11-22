@@ -281,7 +281,7 @@ class Deployer
 
   def replace_instance_name_from_cmd(cmd, opts = {})
     opts.each do |find, replace|
-      cmd = cmd.gsub(/<#{find.to_s_upcase}>/, replace)
+      cmd = cmd.gsub(/<#{find.to_s.upcase}>/, replace)
     end
     cmd
   end
