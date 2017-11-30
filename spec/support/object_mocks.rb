@@ -1,4 +1,12 @@
 module ObjectMocks
+  def created_instance_ids
+    ['ins-1', 'ins-2']
+  end
+
+  def removed_instance_ids
+    ['ins-3', 'ins-4']
+  end
+
   def mock_aws_client!
     allow_any_instance_of(AwsClient).to receive(:terminate_instance).and_return(
       nil
@@ -12,11 +20,14 @@ module ObjectMocks
     allow_any_instance_of(AwsClient).to receive(:create_ami).and_return(
       'ami-abcdefg'
     )
+    allow_any_instance_of(AwsClient).to receive(:destroy_ami).and_return(
+      nil
+    )
     allow_any_instance_of(AwsClient).to receive(:create_instances).and_return(
-      ['ins-1', 'ins-2']
+      created_instance_ids
     )
     allow_any_instance_of(AwsClient).to receive(:fetch_elb_instance_ids).and_return(
-      ['ins-3', 'ins-4']
+      removed_instance_ids
     )
     allow_any_instance_of(AwsClient).to receive(:fetch_ami_status).and_return(
       'available'
