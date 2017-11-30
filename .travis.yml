@@ -2,7 +2,8 @@ language: ruby
 rvm:
   - 2.3.3
 before_install:
-  - "cp .env.example .env"
+  - cp .env.example .env
+  - mkdir -p log
 script:
   - bundle exec rspec
   - bundle exec rubocop
