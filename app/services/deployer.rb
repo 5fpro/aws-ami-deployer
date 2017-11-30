@@ -134,7 +134,7 @@ class Deployer
   def create_instances_until_available(ami_id, count)
     instance_ids = create_instances(ami_id, count)
     instances = generate_instances(instance_ids)
-    log "created instances: #{instances.inspect}"
+    log "created instances: #{instances.map(&:id).inspect}"
     instances.each do |instance|
       @default_tags.each { |key, value| aws_client.create_instance_tag(instance.id, key, value) }
       aws_client.create_instance_tag(instance.id, 'Name', instance.name)
@@ -147,31 +147,30 @@ class Deployer
         state = aws_client.fetch_instance_state(instance.id)
         runed = state == 'running'
         health = runed ? health?(instance.id) : false
-        log "#{instance} => status: #{state}, health: #{health}"
+        log "#{instance.id}(#{instance.name}) => status: #{state}, health: #{health}"
         runed_instance_ids << instance.id if runed && health
       end
       wait(20) unless (instance_ids - runed_instance_ids).empty?
     end
-    # why we need read instance's name from map is because their names are not in order
     instances.each do |instance|
       run_post_create_scripts(instance)
     end
     instance_ids
   end
 
-  def add_instances_to_elb_until_available(elb_name, instances)
-    instances.each { |instance_id| aws_client.add_instance_to_elb(elb_name, instance_id) }
-    healthed_instances = []
-    until instances.empty?
-      instances.each do |instance_id|
+  def add_instances_to_elb_until_available(elb_name, instance_ids)
+    instance_ids.each { |instance_id| aws_client.add_instance_to_elb(elb_name, instance_id) }
+    healthed_instance_ids = []
+    until instance_ids.empty?
+      instance_ids.each do |instance_id|
         state = aws_client.check_instance_health_of_elb(elb_name, instance_id)
         log "#{instance_id} of ELB: #{state}"
-        healthed_instances << instance_id if state == 'InService'
+        healthed_instance_ids << instance_id if state == 'InService'
       end
-      healthed_instances.each { |i| instances.delete(i) }
+      healthed_instance_ids.each { |id| instance_ids.delete(id) }
       wait(5)
     end
-    healthed_instances
+    healthed_instance_ids
   end
 
   def remove_and_terminate_exists_instances_from_elb(elb_name, instance_ids)
