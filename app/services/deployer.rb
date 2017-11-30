@@ -177,8 +177,8 @@ class Deployer
     instance_ids.each do |instance_id|
       aws_client.remove_instance_from_elb(elb_name, instance_id)
     end
-    wait(300)
     log 'waiting 300 seconds to terminate old instances'
+    wait(300)
     instance_ids.each do |instance_id|
       aws_client.terminate_instance(instance_id)
     end
