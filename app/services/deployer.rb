@@ -174,9 +174,13 @@ class Deployer
     healthed_instances
   end
 
-  def remove_and_terminate_exists_instances_from_elb(elb_name, instances)
-    instances.each do |instance_id|
+  def remove_and_terminate_exists_instances_from_elb(elb_name, instance_ids)
+    instance_ids.each do |instance_id|
       aws_client.remove_instance_from_elb(elb_name, instance_id)
+    end
+    wait(300)
+    log 'waiting 300 seconds to terminate old instances'
+    instance_ids.each do |instance_id|
       aws_client.terminate_instance(instance_id)
     end
   end
