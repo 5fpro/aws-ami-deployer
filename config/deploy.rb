@@ -2,7 +2,7 @@
 lock '3.8.2'
 
 set :application, ENV['APP_NAME']
-set :repo_url, "git@github.com:5fpro/aws-ami-deployer.git"
+set :repo_url, 'git@github.com:5fpro/aws-ami-deployer.git'
 
 # Default branch is :master
 ask :branch, `git rev-parse --abbrev-ref HEAD`.chomp
@@ -35,9 +35,7 @@ append :linked_dirs, 'log', 'tmp/pids', 'tmp/cache'
 # Default value for keep_releases is 5
 # set :keep_releases, 5
 
-set :ssh_options, {
-  forward_agent: true
-}
+set :ssh_options, forward_agent: true
 
 set :rbenv_type, :user
 set :rbenv_ruby, IO.read('.ruby-version').strip

@@ -61,21 +61,22 @@ class Deployer
 
   def perform
     log "Parameters: #{params.inspect}"
-  begin
-    ami_name = "#{@name}-web-#{Time.now.strftime('%Y%m%d%H%M')}"
-    return 'instance not health' unless check_instance_health(@instance)
+    begin
+      ami_name = "#{@name}-web-#{Time.now.strftime('%Y%m%d%H%M')}"
+      return 'instance not health' unless check_instance_health(@instance)
 
-    ami_id = create_ami_until_available(@instance, ami_name)
-    instances = create_instances_until_available(ami_id, @count)
-    exists_instances = fetch_elb_instance_ids(@elb_name)
-    log exists_instances.inspect
-    add_instances_to_elb_until_available(@elb_name, instances)
-    remove_and_terminate_exists_instances_from_elb(@elb_name, exists_instances)
-    `rm #{@log_file}`
-  rescue => e
-    log "Fail! #{e.class.to_s}: #{e.message}"
-    log e.backtrace.inspect
-  end
+      ami_id = create_ami_until_available(@instance, ami_name)
+      instance_ids = create_instances_until_available(ami_id, @count)
+      exists_instance_ids = aws_client.fetch_elb_instance_ids(@elb_name)
+      log exists_instance_ids.inspect
+      add_instances_to_elb_until_available(@elb_name, instance_ids)
+      remove_and_terminate_exists_instances_from_elb(@elb_name, exists_instance_ids)
+      `rm #{@log_file}`
+    rescue => e
+      log "Fail! #{e.class}: #{e.message}"
+      log e.backtrace.inspect
+      raise e if App.env.test?
+    end
     @log_id
   end
 
@@ -100,79 +101,83 @@ class Deployer
 
   def check_instance_health(instance)
     health = false
-    until(health)
+    until health
       log "checking health of #{instance}"
       health = health?(instance)
       log health.inspect
-      sleep(5)
+      wait(5)
     end
     health
   end
 
   def create_ami_until_available(instance_id, ami_name)
-    ami_id = create_ami(instance_id, ami_name)
+    ami_id = aws_client.create_ami(instance_id, ami_name)
     log "ami: #{ami_id}"
-    create_ami_tag(ami_id, 'Branch', @git[:branch])
-    create_ami_tag(ami_id, 'SHA', @git[:sha])
-    create_ami_tag(ami_id, 'AMIDeploy', @name)
+    aws_client.create_ami_tag(ami_id, 'Branch', @git[:branch])
+    aws_client.create_ami_tag(ami_id, 'SHA', @git[:sha])
+    aws_client.create_ami_tag(ami_id, 'AMIDeploy', @name)
     status = nil
     while status != 'available'
-      status = fetch_ami_status(ami_id)
+      status = aws_client.fetch_ami_status(ami_id)
       log "AMI status: #{status}"
-      sleep(20) if status != 'available'
+      wait(20) if status != 'available'
     end
     ami_id
   end
 
-  def create_instances_until_available(ami_id, count)
-    instances = create_instances(ami_id, count)
-    names = {}
-    log "created instances: #{instances.inspect}"
-    instances.each_with_index do |instance, index|
-      @default_tags.each { |key, value| create_instance_tags(instance, key, value) }
-      instance_name = "#{@name}-#{index + 1}"
-      names[instance] = instance_name
-      create_instance_tags(instance, 'Name', instance_name)
-      create_instance_tags(instance, 'AMIDeploy', @name)
+  def generate_instances(instance_ids)
+    @instances = instance_ids.each_with_index.map do |instance_id, index|
+      Instance.new(id: instance_id, name: "#{@name}-#{index + 1}", index: index)
     end
-    ok_instances = []
-    until instances.empty?
+  end
+
+  def create_instances_until_available(ami_id, count)
+    instance_ids = create_instances(ami_id, count)
+    instances = generate_instances(instance_ids)
+    log "created instances: #{instances.inspect}"
+    instances.each do |instance|
+      @default_tags.each { |key, value| aws_client.create_instance_tag(instance.id, key, value) }
+      aws_client.create_instance_tag(instance.id, 'Name', instance.name)
+      aws_client.create_instance_tag(instance.id, 'AMIDeploy', @name)
+    end
+    runed_instance_ids = []
+    until (instance_ids - runed_instance_ids).empty?
       instances.each do |instance|
-        state = fetch_instance_state(instance)
+        next if runed_instance_ids.include?(instance.id)
+        state = aws_client.fetch_instance_state(instance.id)
         runed = state == 'running'
-        health = runed ? health?(instance) : false
+        health = runed ? health?(instance.id) : false
         log "#{instance} => status: #{state}, health: #{health}"
-        ok_instances << instance if runed && health
+        runed_instance_ids << instance.id if runed && health
       end
-      ok_instances.each { |i| instances.delete(i) }
-      sleep(20) unless instances.empty?
+      wait(20) unless (instance_ids - runed_instance_ids).empty?
     end
     # why we need read instance's name from map is because their names are not in order
-    ok_instances.each_with_index do |instance, index|
-      run_post_create_scripts(instance, names[instance], index)
+    instances.each do |instance|
+      run_post_create_scripts(instance)
     end
-    ok_instances
+    instance_ids
   end
 
   def add_instances_to_elb_until_available(elb_name, instances)
-    instances.each { |instance_id| add_instance_to_elb(elb_name, instance_id) }
+    instances.each { |instance_id| aws_client.add_instance_to_elb(elb_name, instance_id) }
     healthed_instances = []
     until instances.empty?
       instances.each do |instance_id|
-        state = check_instance_health_of_elb(elb_name, instance_id)
+        state = aws_client.check_instance_health_of_elb(elb_name, instance_id)
         log "#{instance_id} of ELB: #{state}"
         healthed_instances << instance_id if state == 'InService'
       end
       healthed_instances.each { |i| instances.delete(i) }
-      sleep(5)
+      wait(5)
     end
     healthed_instances
   end
 
   def remove_and_terminate_exists_instances_from_elb(elb_name, instances)
     instances.each do |instance_id|
-      remove_instance_from_elb(elb_name, instance_id)
-      terminate_instance(instance_id)
+      aws_client.remove_instance_from_elb(elb_name, instance_id)
+      aws_client.terminate_instance(instance_id)
     end
   end
 
@@ -185,7 +190,7 @@ class Deployer
     checker[:port] ||= 80
     checker[:method] ||= 'get'
     checker[:count] ||= 3
-    ip = fetch_instance_ip(instance_id)
+    ip = aws_client.fetch_instance_ip(instance_id)
     res = false
     if ip
       begin
@@ -195,6 +200,7 @@ class Deployer
         res = (response.status == checker[:status].to_i && response.body.index(checker[:body_match]) >= 0)
       rescue => e
         log "instance #{instance_id} is not health: #{e.message}"
+        raise e if App.env.test?
       end
     end
     if res
@@ -207,79 +213,28 @@ class Deployer
     end
   end
 
-  def terminate_instance(instance_id)
-    aws_cmd("ec2 terminate-instances --instance-ids #{instance_id}")
-  end
-
-  def create_ami_tag(ami_id, key, value)
-    aws_cmd("ec2 create-tags --resources #{ami_id} --tags Key=#{key},Value=#{value}")
-  end
-
-  def create_instance_tags(instance_id, key, value)
-    aws_cmd("ec2 create-tags --resources #{instance_id} --tags Key=#{key},Value=#{value}")
-  end
-
-  def create_ami(instance_id, ami_name)
-    aws_cmd("ec2 create-image --instance-id #{instance_id} --name #{ami_name} --no-reboot")['ImageId']
-  end
-
   def create_instances(ami_id, count)
-    options = [
-      '--monitoring Enabled=true',
-      "--security-group-ids #{@launch_options[:security_group_id]}",
-      "--instance-type #{@launch_options[:instance_type]}",
-      '--enable-api-termination',
-      "--subnet-id #{@launch_options[:subnet_id]}",
-      '--associate-public-ip-address',
-      "--iam-instance-profile Name=\"#{@launch_options[:iam_role]}\"",
-      "--placement AvailabilityZone=#{@launch_options[:availability_zone]}",
-      "--count #{count}"
-    ]
-    aws_cmd("ec2 run-instances --image-id #{ami_id} #{options.join(' ')}")['Instances'].map { |h| h['InstanceId'] }
-  end
-
-  def fetch_instance_tag_value(instance_id, tag_name)
-    aws_cmd("ec2 describe-instances --instance-id #{instance_id}").values[0][0]['Instances'][0]['Tags'].select { |h| h['Key'] == tag_name }.first.try(:[], 'Value')
-  end
-
-  def fetch_elb_instance_ids(elb_name)
-    aws_cmd("elb describe-instance-health --load-balancer-name #{elb_name}")['InstanceStates'].map { |i| i['InstanceId'] }
-  end
-
-  def fetch_ami_status(ami_id)
-    aws_cmd("ec2 describe-images --image-ids #{ami_id}")['Images'][0]['State']
-  end
-
-  def fetch_instance_ip(instance_id)
-    aws_cmd("ec2 describe-instances --instance-id #{instance_id}").values[0][0]['Instances'][0]['PublicIpAddress']
-  end
-
-  def fetch_instance_state(instance_id)
-    aws_cmd("ec2 describe-instances --instance-id #{instance_id}").values[0][0]['Instances'][0]['State']['Name']
-  end
-
-  def add_instance_to_elb(elb_name, instance_id)
-    aws_cmd("elb register-instances-with-load-balancer --load-balancer-name #{elb_name} --instances #{instance_id}")
-  end
-
-  def remove_instance_from_elb(elb_name, instance_id)
-    aws_cmd("elb deregister-instances-from-load-balancer --load-balancer-name #{elb_name} --instances #{instance_id}")
-  end
-
-  def check_instance_health_of_elb(elb_name, instance_id)
-    aws_cmd("elb describe-instance-health --load-balancer-name #{elb_name} --instances #{instance_id}")['InstanceStates'].first['State']
+    aws_client.create_instances(
+      ami_id: ami_id,
+      count: count,
+      security_group_id: @launch_options[:security_group_id],
+      instance_type: @launch_options[:instance_type],
+      subnet_id: @launch_options[:subnet_id],
+      iam_role: @launch_options[:iam_role],
+      availability_zone: @launch_options[:availability_zone]
+    )
   end
 
   def run_command_with_log(cmd)
     IO.popen(cmd) do |result|
       while output = result.gets
         # remove color code for logging
-        log ">> #{output.gsub(/\e\[.*?m/,'')}"
+        log ">> #{output.gsub(/\e\[.*?m/, '')}"
       end
     end
   end
 
-  def replace_instance_name_from_cmd(cmd, opts = {})
+  def render_cmd_template(cmd, opts = {})
     opts.each do |find, replace|
       cmd = cmd.gsub(/<#{find.to_s.upcase}>/, replace.to_s)
     end
@@ -295,17 +250,17 @@ class Deployer
     result
   end
 
-  def run_post_create_scripts(instance_id, instance_name, index)
-    ip = fetch_instance_ip(instance_id)
+  def run_post_create_scripts(instance)
+    ip = aws_client.fetch_instance_ip(instance.id)
     # We do not check the host key since it will be changed by AWS
-    ssh_command = @post_create_scripts[:ssh_command] || "ssh -o StrictHostKeyChecking=no"
-    ssh_user = @post_create_scripts[:ssh_user].nil? ? "" : "#{@post_create_scripts[:ssh_user]}@"
+    ssh_command = @post_create_scripts[:ssh_command] || 'ssh -o StrictHostKeyChecking=no'
+    ssh_user = @post_create_scripts[:ssh_user].nil? ? '' : "#{@post_create_scripts[:ssh_user]}@"
     command_prefix = "#{ssh_command} #{ssh_user}#{ip}"
     # commands
     @post_create_scripts[:commands]&.each do |remote_raw_command|
-      remote_command = replace_instance_name_from_cmd(remote_raw_command, instance_name: instance_name)
+      remote_command = render_cmd_template(remote_raw_command, instance_name: instance.name)
       log "running command: #{remote_command}"
-      cmd =  "#{command_prefix} #{pack_remote_command(remote_command)}"
+      cmd = "#{command_prefix} #{pack_remote_command(remote_command)}"
       run_command_with_log(cmd)
     end
     # local scripts
@@ -322,23 +277,9 @@ class Deployer
     end
     # assign route53 a record
     domain_name_pattern = @post_create_scripts[:route53_a_records]&.dig(:domain_name_pattern)
-    domain_name = replace_instance_name_from_cmd(domain_name_pattern, instance_id: instance_id, instance_name: instance_name, index: index + 1)
-    assign_route53_a_record(ip, domain_name)
-  end
-
-  def assign_route53_a_record(ip, domain_name)
+    domain_name = render_cmd_template(domain_name_pattern, instance_id: instance.id, instance_name: instance.name, index: instance.index + 1)
     hosted_zone_id = @post_create_scripts[:route53_a_records]&.dig(:hosted_zone_id)
-    tmp_json_file = File.join('', 'tmp', "#{ip}-#{domain_name}-#{Time.now.to_i}")
-    IO.write(tmp_json_file, {
-      Changes: [{ Action: 'UPSERT', ResourceRecordSet: { Name: domain_name, Type: 'A', TTL: 300, ResourceRecords: [{ Value: ip }] } }]
-    }.to_json)
-    aws_cmd("route53 change-resource-record-sets --hosted-zone-id #{hosted_zone_id} --change-batch file://#{tmp_json_file}")
-    File.delete(tmp_json_file)
-  end
-
-  def aws_cmd(body)
-    res = `#{ENV['AWS_PATH']}aws #{body} #{@awscli_postfix}`
-    res.present? ? JSON.parse(res) : res
+    aws_client.assign_a_record(hosted_zone_id, domain_name, ip)
   end
 
   def log(msg)
@@ -348,5 +289,13 @@ class Deployer
 
   def logger
     @logger ||= Logger.new(@log_file)
+  end
+
+  def aws_client
+    @aws_client ||= AwsClient.new(cmd_postfix: @awscli_postfix)
+  end
+
+  def wait(seconds)
+    App.env.test? ? sleep(1) : sleep(seconds)
   end
 end

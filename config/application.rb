@@ -8,7 +8,7 @@ class App < Sinatra::Base
   end
 
   post '/deploy' do
-    Deployer.new(params['deploy'].symbolize_keys.merge(log_id: params[:no])).perform
+    Deployer.new(params['deploy'].deep_symbolize_keys.merge(log_id: params[:no])).perform
   end
 
   get '/log' do

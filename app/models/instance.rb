@@ -1,3 +1,3 @@
 class Instance < BaseModel
-  attr_accessor :id, :name, :ip
+  attr_accessor :id, :name, :index
 end

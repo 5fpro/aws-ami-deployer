@@ -1,0 +1,20 @@
+{
+  "RSpec": {
+    "coverage": {
+      "/Users/marsz/projects/aws-ami-deployer/spec/services/deployer_spec.rb": [
+        1,
+        null,
+        1,
+        null,
+        2,
+        2,
+        2,
+        1,
+        1,
+        null,
+        null
+      ]
+    },
+    "timestamp": 1512026556
+  }
+}
