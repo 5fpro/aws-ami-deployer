@@ -7,7 +7,6 @@ gem 'require_all'
 gem 'sinatra'
 
 group :development do
-  gem 'byebug'
   gem 'capistrano'
   gem 'capistrano-bundler'
   gem 'capistrano-rbenv'
@@ -17,4 +16,9 @@ end
 
 group :test do
   gem 'rspec'
+  gem 'webmock'
+end
+
+group :development, :test do
+  gem 'byebug'
 end

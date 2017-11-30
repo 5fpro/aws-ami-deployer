@@ -16,7 +16,14 @@ require File.expand_path(File.join(File.dirname(__FILE__), 'application'))
 App.root = ROOT_DIR
 
 def App.env
-  @env ||= RACK_ENV
+  @env ||= String.new(RACK_ENV)
+  unless @env.respond_to?(:method_missing)
+    def @env.method_missing(method_name, *args)
+      return self == method_name.to_s[0..-2] if method_name.to_s[-1] == '?'
+      super(method_name, *args)
+    end
+  end
+  @env
 end
 
 Dir[File.join(App.root, 'app', '*')].each do |dir|
