@@ -6,18 +6,18 @@ describe App, type: :request do
 
   before { `touch #{log_file}` }
 
-  it "log?live=1" do
-    get "/log", live: 1, no: no
+  it 'log?live=1' do
+    get '/log', live: 1, no: no
     expect(last_response).to be_ok
   end
 
-  it "log" do
-    get "/log", no: no
+  it 'log' do
+    get '/log', no: no
     expect(last_response).to be_ok
   end
 
-  it "log not exisst" do
-    get "/log", no: 456
+  it 'log not exisst' do
+    get '/log', no: 456
     expect(last_response).to be_ok
   end
 end
