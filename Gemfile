@@ -15,9 +15,9 @@ group :development do
 end
 
 group :test do
+  gem 'codecov', require: false
   gem 'rspec'
   gem 'webmock'
-  gem 'codecov', require: false
 end
 
 group :development, :test do
