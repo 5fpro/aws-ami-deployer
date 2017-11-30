@@ -16,9 +16,9 @@ class App < Sinatra::Base
     body = File.exist?(log_file) ? `cat #{log_file}`.to_s.gsub("\n", "<br />\n") : 'Log file is not exists.'
     reload_script = '<script>setTimeout(function(){location.reload();}, 5000);window.scrollTo(0,document.body.scrollHeight);</script>'
     if params['live']
-      '<div><a href="?">Stop auto reload</a></div>' + body + reload_script
+      "<div><a href=\"?no=#{params[:no]}\">Stop auto reload</a></div>" + body + reload_script
     else
-      '<div><a href="?live=1">Auto reload</a></div>' + body
+      "<div><a href=\"?no=#{params[:no]}&live=1\">Auto reload</a></div>" + body
     end
   end
 end
