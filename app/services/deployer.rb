@@ -71,13 +71,12 @@ class Deployer
       log exists_instance_ids.inspect
       add_instances_to_elb_until_available(@elb_name, instance_ids)
       remove_and_terminate_exists_instances_from_elb(@elb_name, exists_instance_ids)
-      finished_processing(true)
     rescue => e
       log "Fail! #{e.class}: #{e.message}"
       log e.backtrace.inspect
-      finished_processing(false)
-      raise e if App.env.test?
+      return finished_processing(e)
     end
+    finished_processing(true)
     @log_id
   end
 
@@ -112,18 +111,18 @@ class Deployer
   end
 
   def create_ami_until_available(instance_id, ami_name)
-    ami_id = aws_client.create_ami(instance_id, ami_name)
-    log "ami: #{ami_id}"
-    aws_client.create_ami_tag(ami_id, 'Branch', @git[:branch])
-    aws_client.create_ami_tag(ami_id, 'SHA', @git[:sha])
-    aws_client.create_ami_tag(ami_id, 'AMIDeploy', @name)
+    @ami_id = aws_client.create_ami(instance_id, ami_name)
+    log "ami: #{@ami_id}"
+    aws_client.create_ami_tag(@ami_id, 'Branch', @git[:branch])
+    aws_client.create_ami_tag(@ami_id, 'SHA', @git[:sha])
+    aws_client.create_ami_tag(@ami_id, 'AMIDeploy', @name)
     status = nil
     while status != 'available'
-      status = aws_client.fetch_ami_status(ami_id)
+      status = aws_client.fetch_ami_status(@ami_id)
       log "AMI status: #{status}"
       wait(20) if status != 'available'
     end
-    ami_id
+    @ami_id
   end
 
   def generate_instances(instance_ids)
@@ -297,10 +296,25 @@ class Deployer
   end
 
   def wait(seconds)
-    App.env.test? ? sleep(1) : sleep(seconds)
+    App.env.test? ? sleep(0) : sleep(seconds)
   end
 
-  def finished_processing(success = true)
-    log "Finished!(#{success ? 'success' : 'fail'})"
+  def finished_processing(exception)
+    if exception.is_a?(Exception)
+      if @ami_id.present?
+        log "Fail: Deregister AMI-#{@ami_id}"
+        aws_client.destroy_ami(@ami_id)
+      end
+      if @instances
+        @instances.each do |instance|
+          log "Fail: Terminating instance #{instance.id}(#{instance.name})"
+          aws_client.terminate_instance(instance.id)
+        end
+      end
+      log 'Fail!'
+      raise exception if App.env.test?
+    else
+      log 'Success!'
+    end
   end
 end

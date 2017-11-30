@@ -19,6 +19,10 @@ class AwsClient
     aws_cmd("ec2 create-image --instance-id #{instance_id} --name #{ami_name} --no-reboot")['ImageId']
   end
 
+  def destroy_ami(ami_id)
+    aws_cmd("ec2 deregister-image --image-id #{ami_id}")
+  end
+
   def create_instances(count: 1, ami_id:, security_group_id:, subnet_id:, instance_type:, availability_zone:, iam_role:)
     options = [
       '--monitoring Enabled=true',
