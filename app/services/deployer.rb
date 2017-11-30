@@ -71,10 +71,11 @@ class Deployer
       log exists_instance_ids.inspect
       add_instances_to_elb_until_available(@elb_name, instance_ids)
       remove_and_terminate_exists_instances_from_elb(@elb_name, exists_instance_ids)
-      `rm #{@log_file}`
+      finished_processing(true)
     rescue => e
       log "Fail! #{e.class}: #{e.message}"
       log e.backtrace.inspect
+      finished_processing(false)
       raise e if App.env.test?
     end
     @log_id
@@ -297,5 +298,9 @@ class Deployer
 
   def wait(seconds)
     App.env.test? ? sleep(1) : sleep(seconds)
+  end
+
+  def finished_processing(success = true)
+    log "Finished!(#{success ? 'success' : 'fail'})"
   end
 end
