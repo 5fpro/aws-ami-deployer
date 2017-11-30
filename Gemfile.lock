@@ -54,6 +54,8 @@ GEM
     rack (2.0.3)
     rack-protection (2.0.0)
       rack
+    rack-test (0.8.2)
+      rack (>= 1.0, < 3)
     rainbow (2.2.2)
       rake
     rake (12.0.0)
@@ -118,6 +120,7 @@ DEPENDENCIES
   dotenv
   faraday
   foreman
+  rack-test
   rake
   require_all
   rspec
