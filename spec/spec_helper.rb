@@ -12,6 +12,7 @@ RSpec.configure do |config|
   config.before { mock_aws_client! }
   config.before { mock_cmd! }
   config.before { mock_requests! }
+  config.after(:suite) { `rm #{App.root}/log/deploy*.log` }
 
   config.expect_with :rspec do |expectations|
     expectations.include_chain_clauses_in_custom_matcher_descriptions = true
