@@ -304,19 +304,16 @@ class Deployer
   end
 
   def finished_processing(exception)
-    if exception.is_a?(Exception)
-      if @ami_id.present?
-        log "Fail: Deregister AMI-#{@ami_id}"
-        aws_client.destroy_ami(@ami_id)
-      end
-      @instances&.each do |instance|
-        log "Fail: Terminating instance #{instance.id}(#{instance.name})"
-        aws_client.terminate_instance(instance.id)
-      end
-      log 'Fail!'
-      raise exception if App.env.test?
-    else
-      log 'Success!'
+    return log('Success!') unless exception.is_a?(Exception)
+    if @ami_id.present?
+      log "Fail: Deregister AMI-#{@ami_id}"
+      aws_client.destroy_ami(@ami_id)
     end
+    @instances&.each do |instance|
+      log "Fail: Terminating instance #{instance.id}(#{instance.name})"
+      aws_client.terminate_instance(instance.id)
+    end
+    log 'Fail!'
+    raise exception if App.env.test?
   end
 end
