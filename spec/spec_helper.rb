@@ -1,8 +1,5 @@
 ENV['RACK_ENV'] ||= 'test'
 require File.expand_path(File.join(File.dirname(__FILE__), '..', 'config', 'boot'))
-require 'webmock/rspec'
-
-WebMock.disable_net_connect!
 
 Dir[File.join(App.root, 'spec', 'support', '**', '*')].each { |f| require f }
 
@@ -27,3 +24,5 @@ RSpec.configure do |config|
   config.shared_context_metadata_behavior = :apply_to_host_groups
 
 end
+
+Dir[File.join(App.root, 'spec', 'config', '**', '*.rb')].each { |f| require f }
