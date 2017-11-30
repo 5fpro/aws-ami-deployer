@@ -66,11 +66,11 @@ class Deployer
     return 'instance not health' unless check_instance_health(@instance)
 
     ami_id = create_ami_until_available(@instance, ami_name)
-    instances = create_instances_until_available(ami_id, @count)
-    exists_instances = fetch_elb_instance_ids(@elb_name)
-    log exists_instances.inspect
-    add_instances_to_elb_until_available(@elb_name, instances)
-    remove_and_terminate_exists_instances_from_elb(@elb_name, exists_instances)
+    instance_ids = create_instances_until_available(ami_id, @count)
+    exists_instance_ids = fetch_elb_instance_ids(@elb_name)
+    log exists_instance_ids.inspect
+    add_instances_to_elb_until_available(@elb_name, instance_ids)
+    remove_and_terminate_exists_instances_from_elb(@elb_name, exists_instance_ids)
     `rm #{@log_file}`
   rescue => e
     log "Fail! #{e.class.to_s}: #{e.message}"
@@ -124,34 +124,38 @@ class Deployer
     ami_id
   end
 
+  def generate_instances(instance_ids)
+    @instances = instance_ids.each_with_index.map do |instance_id, index|
+      Instance.new(id: instance_id, name: "#{@name}-#{index + 1}", index: index)
+    end
+  end
+
   def create_instances_until_available(ami_id, count)
-    instances = create_instances(ami_id, count)
-    names = {}
+    instance_ids = create_instances(ami_id, count)
+    instances = generate_instances(instance_ids)
     log "created instances: #{instances.inspect}"
     instances.each_with_index do |instance, index|
-      @default_tags.each { |key, value| create_instance_tags(instance, key, value) }
-      instance_name = "#{@name}-#{index + 1}"
-      names[instance] = instance_name
-      create_instance_tags(instance, 'Name', instance_name)
-      create_instance_tags(instance, 'AMIDeploy', @name)
+      @default_tags.each { |key, value| create_instance_tags(instance.id, key, value) }
+      create_instance_tags(instance.id, 'Name', instance.name)
+      create_instance_tags(instance.id, 'AMIDeploy', @name)
     end
-    ok_instances = []
-    until instances.empty?
+    runed_instance_ids = []
+    until (instance_ids - runed_instance_ids).empty?
       instances.each do |instance|
-        state = fetch_instance_state(instance)
+        next if runed_instance_ids.include?(instance.id)
+        state = fetch_instance_state(instance.id)
         runed = state == 'running'
-        health = runed ? health?(instance) : false
+        health = runed ? health?(instance.id) : false
         log "#{instance} => status: #{state}, health: #{health}"
-        ok_instances << instance if runed && health
+        runed_instance_ids << instance.id if runed && health
       end
-      ok_instances.each { |i| instances.delete(i) }
-      sleep(20) unless instances.empty?
+      sleep(20) unless (instance_ids - runed_instance_ids).empty?
     end
     # why we need read instance's name from map is because their names are not in order
-    ok_instances.each_with_index do |instance, index|
-      run_post_create_scripts(instance, names[instance], index)
+    instances.each do |instance|
+      run_post_create_scripts(instance)
     end
-    ok_instances
+    instance_ids
   end
 
   def add_instances_to_elb_until_available(elb_name, instances)
@@ -279,7 +283,7 @@ class Deployer
     end
   end
 
-  def replace_instance_name_from_cmd(cmd, opts = {})
+  def render_cmd_template(cmd, opts = {})
     opts.each do |find, replace|
       cmd = cmd.gsub(/<#{find.to_s.upcase}>/, replace.to_s)
     end
@@ -295,15 +299,15 @@ class Deployer
     result
   end
 
-  def run_post_create_scripts(instance_id, instance_name, index)
-    ip = fetch_instance_ip(instance_id)
+  def run_post_create_scripts(instance)
+    ip = fetch_instance_ip(instance.id)
     # We do not check the host key since it will be changed by AWS
     ssh_command = @post_create_scripts[:ssh_command] || "ssh -o StrictHostKeyChecking=no"
     ssh_user = @post_create_scripts[:ssh_user].nil? ? "" : "#{@post_create_scripts[:ssh_user]}@"
     command_prefix = "#{ssh_command} #{ssh_user}#{ip}"
     # commands
     @post_create_scripts[:commands]&.each do |remote_raw_command|
-      remote_command = replace_instance_name_from_cmd(remote_raw_command, instance_name: instance_name)
+      remote_command = render_cmd_template(remote_raw_command, instance_name: instance.name)
       log "running command: #{remote_command}"
       cmd =  "#{command_prefix} #{pack_remote_command(remote_command)}"
       run_command_with_log(cmd)
@@ -322,7 +326,7 @@ class Deployer
     end
     # assign route53 a record
     domain_name_pattern = @post_create_scripts[:route53_a_records]&.dig(:domain_name_pattern)
-    domain_name = replace_instance_name_from_cmd(domain_name_pattern, instance_id: instance_id, instance_name: instance_name, index: index + 1)
+    domain_name = render_cmd_template(domain_name_pattern, instance_id: instance.id, instance_name: instance.name, index: instance.index + 1)
     assign_route53_a_record(ip, domain_name)
   end
 
