@@ -282,6 +282,7 @@ class Deployer
     domain_name_pattern = @post_create_scripts[:route53_a_records]&.dig(:domain_name_pattern)
     domain_name = render_cmd_template(domain_name_pattern, instance_id: instance.id, instance_name: instance.name, index: instance.index + 1)
     hosted_zone_id = @post_create_scripts[:route53_a_records]&.dig(:hosted_zone_id)
+    log "assign A record #{domain_name} with #{ip} to #{instance.id}(#{instance.name})"
     aws_client.assign_a_record(hosted_zone_id, domain_name, ip)
   end
 
