@@ -1,12 +1,8 @@
 AllCops:
   Exclude:
     - bin/**/*
-    - config/**/*
-    - db/**/*
     - log/**/*
     - public/**/*
-    - spec/rails_helper.rb
-    - spec/spec_helper.rb
     - tmp/**/*
     - vendor/**/*
     - node_modules/**/*
@@ -65,7 +61,7 @@ Metrics/MethodLength:
   Max: 20
 
 Metrics/AbcSize:
-  Max: 30
+  Max: 80
 
 Rails/HasAndBelongsToMany:
   Enabled: false
@@ -93,9 +89,6 @@ Lint/AssignmentInCondition:
 
 Lint/NestedMethodDefinition:
   Enabled: false
-
-Metrics/AbcSize:
-  Max: 50
 
 Metrics/PerceivedComplexity:
   Max: 30
@@ -138,3 +131,13 @@ Lint/AmbiguousBlockAssociation:
 
 Style/SymbolArray:
   EnforcedStyle: brackets
+
+Metrics/ClassLength:
+  Max: 250
+
+Metrics/ParameterLists:
+  Max: 15
+
+Style/MethodMissing:
+  Exclude:
+    - 'config/boot.rb'

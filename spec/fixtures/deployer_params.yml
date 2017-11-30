@@ -1,0 +1,32 @@
+test:
+  count: 2
+  name: 'web'
+  source_instance_id: 'i-abcabcd'
+  elb_name: 'example-5fpro-com'
+  launch_options:
+    security_group_id: 'sg-abcd'
+    instance_type: 't2.medium'
+    subnet_id: 'subnet-ancd'
+    iam_role: 'ec2'
+    availability_zone: 'ap-northeast-1a'
+  post_create_scripts:
+    ssh_user: "ubuntu"
+    ssh_command: "ssh -i ~/.ssh/aws_deploy -o StrictHostKeyChecking=no" # default to 'ssh -o StrictHostKeyChecking=no'
+    commands: ["echo '<INSTANCE_NAME>' | sudo bash /root/rename-server"] # optional
+    local_files: [] # optional
+    remote_files: ['/home/ubuntu/server_init_setting.sh'] # optional
+    route53_a_records:
+      hosted_zone_id: 'abcde'
+      domain_name_pattern: 'web-<INDEX>.5fpro.com'
+  health_check_rule:
+    port: 88
+    protocol: 'http'
+    method: 'get'
+    path: '/ping'
+    status: 200
+    body_match: 'ok'
+    count: 3
+  default_tags:
+    Env: 'production'
+    Version: 'web'
+  awscli_postfix: ''
