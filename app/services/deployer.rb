@@ -61,22 +61,22 @@ class Deployer
 
   def perform
     log "Parameters: #{params.inspect}"
-  begin
-    ami_name = "#{@name}-web-#{Time.now.strftime('%Y%m%d%H%M')}"
-    return 'instance not health' unless check_instance_health(@instance)
+    begin
+      ami_name = "#{@name}-web-#{Time.now.strftime('%Y%m%d%H%M')}"
+      return 'instance not health' unless check_instance_health(@instance)
 
-    ami_id = create_ami_until_available(@instance, ami_name)
-    instance_ids = create_instances_until_available(ami_id, @count)
-    exists_instance_ids = aws_client.fetch_elb_instance_ids(@elb_name)
-    log exists_instance_ids.inspect
-    add_instances_to_elb_until_available(@elb_name, instance_ids)
-    remove_and_terminate_exists_instances_from_elb(@elb_name, exists_instance_ids)
-    `rm #{@log_file}`
-  rescue => e
-    log "Fail! #{e.class.to_s}: #{e.message}"
-    log e.backtrace.inspect
-    raise e if App.env.test?
-  end
+      ami_id = create_ami_until_available(@instance, ami_name)
+      instance_ids = create_instances_until_available(ami_id, @count)
+      exists_instance_ids = aws_client.fetch_elb_instance_ids(@elb_name)
+      log exists_instance_ids.inspect
+      add_instances_to_elb_until_available(@elb_name, instance_ids)
+      remove_and_terminate_exists_instances_from_elb(@elb_name, exists_instance_ids)
+      `rm #{@log_file}`
+    rescue => e
+      log "Fail! #{e.class}: #{e.message}"
+      log e.backtrace.inspect
+      raise e if App.env.test?
+    end
     @log_id
   end
 
@@ -101,7 +101,7 @@ class Deployer
 
   def check_instance_health(instance)
     health = false
-    until(health)
+    until health
       log "checking health of #{instance}"
       health = health?(instance)
       log health.inspect
@@ -135,7 +135,7 @@ class Deployer
     instance_ids = create_instances(ami_id, count)
     instances = generate_instances(instance_ids)
     log "created instances: #{instances.inspect}"
-    instances.each_with_index do |instance, index|
+    instances.each do |instance|
       @default_tags.each { |key, value| aws_client.create_instance_tag(instance.id, key, value) }
       aws_client.create_instance_tag(instance.id, 'Name', instance.name)
       aws_client.create_instance_tag(instance.id, 'AMIDeploy', @name)
@@ -229,7 +229,7 @@ class Deployer
     IO.popen(cmd) do |result|
       while output = result.gets
         # remove color code for logging
-        log ">> #{output.gsub(/\e\[.*?m/,'')}"
+        log ">> #{output.gsub(/\e\[.*?m/, '')}"
       end
     end
   end
@@ -253,8 +253,8 @@ class Deployer
   def run_post_create_scripts(instance)
     ip = aws_client.fetch_instance_ip(instance.id)
     # We do not check the host key since it will be changed by AWS
-    ssh_command = @post_create_scripts[:ssh_command] || "ssh -o StrictHostKeyChecking=no"
-    ssh_user = @post_create_scripts[:ssh_user].nil? ? "" : "#{@post_create_scripts[:ssh_user]}@"
+    ssh_command = @post_create_scripts[:ssh_command] || 'ssh -o StrictHostKeyChecking=no'
+    ssh_user = @post_create_scripts[:ssh_user].nil? ? '' : "#{@post_create_scripts[:ssh_user]}@"
     command_prefix = "#{ssh_command} #{ssh_user}#{ip}"
     # commands
     @post_create_scripts[:commands]&.each do |remote_raw_command|

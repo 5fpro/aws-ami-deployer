@@ -20,7 +20,7 @@ def App.env
   unless @env.respond_to?(:method_missing)
     def @env.method_missing(method_name, *args)
       return self == method_name.to_s[0..-2] if method_name.to_s[-1] == '?'
-      super(method_name, *args)
+      super
     end
   end
   @env
