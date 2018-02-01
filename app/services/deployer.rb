@@ -232,13 +232,13 @@ class Deployer
     IO.popen(cmd) do |result|
       while output = result.gets
         # change encoding so we can display UTF-8 text
-        output.force_encoding("UTF-8")
+        output.force_encoding('UTF-8')
         # remove color code for logging
         begin
           log ">> #{output.gsub(/\e\[.*?m/, '')}"
         rescue
           # if some how we still cannot process the log, just ignore it
-          log ">> (Unknown output format)"
+          log '>> (Unknown output format)'
         end
       end
     end
