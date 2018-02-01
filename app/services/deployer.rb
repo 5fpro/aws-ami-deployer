@@ -231,8 +231,15 @@ class Deployer
   def run_command_with_log(cmd)
     IO.popen(cmd) do |result|
       while output = result.gets
+        # change encoding so we can display UTF-8 text
+        output.force_encoding("UTF-8")
         # remove color code for logging
-        log ">> #{output.gsub(/\e\[.*?m/, '')}"
+        begin
+          log ">> #{output.gsub(/\e\[.*?m/, '')}"
+        rescue
+          # if some how we still cannot process the log, just ignore it
+          log ">> (Unknown output format)"
+        end
       end
     end
   end
