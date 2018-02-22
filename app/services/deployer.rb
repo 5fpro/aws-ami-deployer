@@ -226,7 +226,7 @@ class Deployer
     log 'waiting 300 seconds to terminate old instances'
     wait(300)
     instance_ids.each do |instance_id|
-      aws_client.terminate_instance(instance_id)
+      aws_client.terminate_instance(instance_id) if instance_id != @source_instance_id
     end
   end
 
