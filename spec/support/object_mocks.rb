@@ -29,6 +29,9 @@ module ObjectMocks
     allow_any_instance_of(AwsClient).to receive(:fetch_elb_instance_ids).and_return(
       removed_instance_ids
     )
+    allow_any_instance_of(AwsClient).to receive(:fetch_elbv2_instance_ids).and_return(
+      removed_instance_ids
+    )
     allow_any_instance_of(AwsClient).to receive(:fetch_ami_status).and_return(
       'available'
     )
@@ -41,11 +44,20 @@ module ObjectMocks
     allow_any_instance_of(AwsClient).to receive(:add_instance_to_elb).and_return(
       nil
     )
+    allow_any_instance_of(AwsClient).to receive(:add_instance_to_elbv2).and_return(
+      nil
+    )
     allow_any_instance_of(AwsClient).to receive(:remove_instance_from_elb).and_return(
+      nil
+    )
+    allow_any_instance_of(AwsClient).to receive(:remove_instance_from_elbv2).and_return(
       nil
     )
     allow_any_instance_of(AwsClient).to receive(:check_instance_health_of_elb).and_return(
       'InService'
+    )
+    allow_any_instance_of(AwsClient).to receive(:check_instance_health_of_elbv2).and_return(
+      'arn-1': 'healthy', 'arn-2': 'healthy'
     )
     allow_any_instance_of(AwsClient).to receive(:assign_a_record).and_return(
       nil
