@@ -49,7 +49,7 @@ class Deployer
   def initialize(count:, name:, source_instance_id:, launch_options:, health_check_rule:, default_tags:, elb_name: nil, elbv2: nil, git:, awscli_postfix: '', log_id: nil, post_create_scripts: {})
     @count = count
     @name = name
-    @instance = source_instance_id
+    @source_instance_id = source_instance_id
     @launch_options = launch_options.symbolize_keys
     @health_check_rule = health_check_rule
     @git = git
@@ -67,9 +67,9 @@ class Deployer
     log "Parameters: #{params.inspect}"
     begin
       ami_name = "#{@name}-web-#{Time.now.strftime('%Y%m%d%H%M')}"
-      return 'instance not health' unless check_instance_health(@instance)
+      return 'instance not health' unless check_instance_health(@source_instance_id)
 
-      ami_id = create_ami_until_available(@instance, ami_name)
+      ami_id = create_ami_until_available(@source_instance_id, ami_name)
       instance_ids = create_instances_until_available(ami_id, @count)
       exists_instance_ids = get_exist_instance_ids
       log exists_instance_ids.inspect
@@ -221,7 +221,7 @@ class Deployer
 
   def remove_and_terminate_exists_instances_from_elb(instance_ids)
     instance_ids.each do |instance_id|
-      remove_instance_from_elb(instance_id)
+      remove_instance_from_elb(instance_id) if instance_id != @source_instance_id
     end
     log 'waiting 300 seconds to terminate old instances'
     wait(300)
