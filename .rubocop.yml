@@ -135,7 +135,7 @@ Style/SymbolArray:
   EnforcedStyle: brackets
 
 Metrics/ClassLength:
-  Max: 300
+  Max: 400
 
 Metrics/ParameterLists:
   Max: 15

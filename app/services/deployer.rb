@@ -220,13 +220,25 @@ class Deployer
   end
 
   def remove_and_terminate_exists_instances_from_elb(instance_ids)
+    log 'removing instances from ELB'
     instance_ids.each do |instance_id|
-      remove_instance_from_elb(instance_id) if instance_id != @source_instance_id
+      if instance_id == @source_instance_id
+        log "#{instance_id} is source instance, skip remove"
+      else
+        remove_instance_from_elb(instance_id)
+        log "removed instance #{instance_id} from ELB"
+      end
     end
     log 'waiting 300 seconds to terminate old instances'
     wait(300)
+    log 'Terminating instances from ELB'
     instance_ids.each do |instance_id|
-      aws_client.terminate_instance(instance_id) if instance_id != @source_instance_id
+      if instance_id == @source_instance_id
+        log "#{instance_id} is source instance, skip terminate"
+      else
+        aws_client.terminate_instance(instance_id)
+        log "terminated instance #{instance_id}"
+      end
     end
   end
 
