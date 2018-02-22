@@ -93,7 +93,7 @@ class AwsClient
   def check_instance_health_of_elbv2(target_group_arns, instance_id)
     target_group_arns.inject({}) do |a, target_group_arn|
       instance_data = aws_cmd("elbv2 describe-target-health --target-group-arn #{target_group_arn}")['TargetHealthDescriptions'].select { |i| i['Target']['Id'] == instance_id }.first || {}
-      a.merge(target_group_arn => instance_data.dig('Target', 'TargetHealth', 'State'))
+      a.merge(target_group_arn => instance_data.dig('TargetHealth', 'State'))
     end
   end
 
