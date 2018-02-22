@@ -5,6 +5,9 @@ class Deployer
   #     name: 'doodle-web',
   #     source_instance_id: 'i-08643369d25e61025',
   #     elb_name: 'livetest-5fpro-com',
+  #     elbv2: {
+  #       target_group_arns: ['xxxx', 'ooooo']
+  #     }
   #     launch_options: {
   #       security_group_id: 'sg-622e0f05',
   #       instance_type: 't2.small',
@@ -43,7 +46,7 @@ class Deployer
   #     },
   #     awscli_postfix: '--profile shopmatic'
   #   }
-  def initialize(count:, name:, source_instance_id:, launch_options:, health_check_rule:, default_tags:, elb_name:, git:, awscli_postfix: '', log_id: nil, post_create_scripts: {})
+  def initialize(count:, name:, source_instance_id:, launch_options:, health_check_rule:, default_tags:, elb_name: nil, elbv2: nil, git:, awscli_postfix: '', log_id: nil, post_create_scripts: {})
     @count = count
     @name = name
     @instance = source_instance_id
@@ -51,6 +54,7 @@ class Deployer
     @health_check_rule = health_check_rule
     @git = git
     @elb_name = elb_name
+    @elbv2 = (elbv2 || {}).symbolize_keys
     @default_tags = default_tags || {}
     @awscli_postfix = awscli_postfix
     @log_id = log_id || Time.now.to_f
@@ -67,10 +71,10 @@ class Deployer
 
       ami_id = create_ami_until_available(@instance, ami_name)
       instance_ids = create_instances_until_available(ami_id, @count)
-      exists_instance_ids = aws_client.fetch_elb_instance_ids(@elb_name)
+      exists_instance_ids = get_exist_instance_ids
       log exists_instance_ids.inspect
-      add_instances_to_elb_until_available(@elb_name, instance_ids)
-      remove_and_terminate_exists_instances_from_elb(@elb_name, exists_instance_ids)
+      add_instances_to_elb_until_available(instance_ids)
+      remove_and_terminate_exists_instances_from_elb(exists_instance_ids)
     rescue => e
       log "Fail! #{e.class}: #{e.message}"
       log e.backtrace.inspect
@@ -81,6 +85,22 @@ class Deployer
   end
 
   private
+
+  def elbv2?
+    @elbv2[:target_group_arns].present?
+  end
+
+  def target_group_arns
+    @target_group_arns ||= @elbv2[:target_group_arns]
+  end
+
+  def get_exist_instance_ids
+    if elbv2?
+      aws_client.fetch_elbv2_instance_ids(target_group_arns)
+    else
+      aws_client.fetch_elb_instance_ids(@elb_name)
+    end
+  end
 
   def params
     @params ||= {
@@ -158,14 +178,32 @@ class Deployer
     instance_ids
   end
 
-  def add_instances_to_elb_until_available(elb_name, instance_ids)
-    instance_ids.each { |instance_id| aws_client.add_instance_to_elb(elb_name, instance_id) }
+  def add_instance_to_elb(instance_id)
+    if elbv2?
+      aws_client.add_instance_to_elbv2(target_group_arns, instance_id)
+    else
+      aws_client.add_instance_to_elb(@elb_name, instance_id)
+    end
+  end
+
+  def instance_health_in_elb?(instance_id)
+    if elbv2?
+      arns_state = aws_client.check_instance_health_of_elbv2(target_group_arns, instance_id)
+      arns_state.each { |arn, state| log "#{instance_id}'s state in #{arn}: #{state}" }
+      arns_state.values.uniq == ['healthy']
+    else
+      state = aws_client.check_instance_health_of_elb(@elb_name, instance_id)
+      log "#{instance_id} of ELB: #{state}"
+      state == 'InService'
+    end
+  end
+
+  def add_instances_to_elb_until_available(instance_ids)
+    instance_ids.each { |instance_id| add_instance_to_elb(instance_id) }
     healthed_instance_ids = []
     until instance_ids.empty?
       instance_ids.each do |instance_id|
-        state = aws_client.check_instance_health_of_elb(elb_name, instance_id)
-        log "#{instance_id} of ELB: #{state}"
-        healthed_instance_ids << instance_id if state == 'InService'
+        healthed_instance_ids << instance_id if instance_health_in_elb?(instance_id)
       end
       healthed_instance_ids.each { |id| instance_ids.delete(id) }
       wait(5)
@@ -173,9 +211,17 @@ class Deployer
     healthed_instance_ids
   end
 
-  def remove_and_terminate_exists_instances_from_elb(elb_name, instance_ids)
+  def remove_instance_from_elb(instance_id)
+    if elbv2?
+      aws_client.remove_instance_from_elbv2(target_group_arns, instance_id)
+    else
+      aws_client.remove_instance_from_elb(@elb_name, instance_id)
+    end
+  end
+
+  def remove_and_terminate_exists_instances_from_elb(instance_ids)
     instance_ids.each do |instance_id|
-      aws_client.remove_instance_from_elb(elb_name, instance_id)
+      remove_instance_from_elb(instance_id)
     end
     log 'waiting 300 seconds to terminate old instances'
     wait(300)

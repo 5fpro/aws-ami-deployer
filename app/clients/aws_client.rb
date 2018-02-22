@@ -46,6 +46,14 @@ class AwsClient
     aws_cmd("elb describe-instance-health --load-balancer-name #{elb_name}")['InstanceStates'].map { |i| i['InstanceId'] }
   end
 
+  def fetch_elbv2_instance_ids(target_group_arns)
+    instance_ids = []
+    target_group_arns.each do |target_group_arn|
+      instance_ids += aws_cmd("elbv2 describe-target-health --target-group-arn #{target_group_arn}")['TargetHealthDescriptions'].map { |i| i['Target']['Id'] }
+    end
+    instance_ids.uniq
+  end
+
   def fetch_ami_status(ami_id)
     aws_cmd("ec2 describe-images --image-ids #{ami_id}")['Images'][0]['State']
   end
@@ -62,12 +70,31 @@ class AwsClient
     aws_cmd("elb register-instances-with-load-balancer --load-balancer-name #{elb_name} --instances #{instance_id}")
   end
 
+  def add_instance_to_elbv2(target_group_arns, instance_id)
+    target_group_arns.each do |target_group_arn|
+      aws_cmd("elbv2 register-targets --target-group-arn #{target_group_arn} --targets Id=#{instance_id}")
+    end
+  end
+
   def remove_instance_from_elb(elb_name, instance_id)
     aws_cmd("elb deregister-instances-from-load-balancer --load-balancer-name #{elb_name} --instances #{instance_id}")
   end
 
+  def remove_instance_from_elbv2(target_group_arns, instance_id)
+    target_group_arns.each do |target_group_arn|
+      aws_cmd("elbv2 deregister-targets --target-group-arn #{target_group_arn} --targets Id=#{instance_id}")
+    end
+  end
+
   def check_instance_health_of_elb(elb_name, instance_id)
     aws_cmd("elb describe-instance-health --load-balancer-name #{elb_name} --instances #{instance_id}")['InstanceStates'].first['State']
+  end
+
+  def check_instance_health_of_elbv2(target_group_arns, instance_id)
+    target_group_arns.inject({}) do |a, target_group_arn|
+      instance_data = aws_cmd("elbv2 describe-target-health --target-group-arn #{target_group_arn}")['TargetHealthDescriptions'].select { |i| i['Target']['Id'] == instance_id }.first || {}
+      a.merge(target_group_arn => instance_data.dig('Target', 'TargetHealth', 'State'))
+    end
   end
 
   def assign_a_record(hosted_zone_id, domain_name, ip)

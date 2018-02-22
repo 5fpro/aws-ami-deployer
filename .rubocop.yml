@@ -83,6 +83,8 @@ Style/PredicateName:
 
 Metrics/MethodLength:
   Max: 50
+  Exclude:
+    - 'spec/support/object_mocks.rb'
 
 Lint/AssignmentInCondition:
   Enabled: false
