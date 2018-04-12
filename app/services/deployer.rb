@@ -255,7 +255,7 @@ class Deployer
     res = false
     if ip
       begin
-        response = Faraday.new(url: "#{checker[:protocol]}://#{ip}:#{checker[:port]}#{checker[:path]}").public_send(checker[:method].to_s.downcase) do |req|
+        response = Faraday.new(url: "#{checker[:protocol]}://#{ip}:#{checker[:port]}#{checker[:path]}", ssl: { verify: false }).public_send(checker[:method].to_s.downcase) do |req|
           req.url checker[:path]
         end
         res = (response.status == checker[:status].to_i && response.body.index(checker[:body_match]) >= 0)
